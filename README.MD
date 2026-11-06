@@ -17,6 +17,12 @@ The JUCE framework itself is not included in this repository. Each teammate
 needs their own JUCE installation; do not copy a computer-specific JUCE path
 into the shared project.
 
+## Use the oscillator
+
+The plug-in continuously generates a tone. Choose Sine, Square, or Sawtooth
+from the Waveform menu and adjust its Frequency control (20-2000 Hz). The
+settings are saved by the plug-in host.
+
 ## Open the project
 
 1. In Projucer, set the JUCE modules path to the `modules` folder inside your

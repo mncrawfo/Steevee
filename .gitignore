@@ -7,3 +7,4 @@ JuceLibraryCode/
 .vscode/
 *.user
 .DS_Store
+/JUCE/

@@ -25,9 +25,13 @@ public:
     void resized() override;
 
 private:
-    // This reference is provided as a quick way for your editor to
-    // access the processor object that created it.
     TestPluginAudioProcessor& audioProcessor;
+    juce::Label frequencyLabel;
+    juce::Slider frequencySlider;
+    juce::Label waveformLabel;
+    juce::ComboBox waveformSelector;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> frequencyAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> waveformAttachment;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TestPluginAudioProcessorEditor)
 };

@@ -20,8 +20,22 @@ TestPluginAudioProcessor::TestPluginAudioProcessor()
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
                        )
+#else
+     : AudioProcessor()
 #endif
+    , parameters (*this, nullptr, juce::Identifier ("TestPluginState"),
+                  {
+                      std::make_unique<juce::AudioParameterFloat> (
+                          juce::ParameterID { "frequency", 1 }, "Frequency",
+                          juce::NormalisableRange<float> (20.0f, 2000.0f, 1.0f, 0.35f),
+                          440.0f, "Hz"),
+                      std::make_unique<juce::AudioParameterChoice> (
+                          juce::ParameterID { "waveform", 1 }, "Waveform",
+                          juce::StringArray { "Sine", "Square", "Sawtooth" }, 0)
+                  })
 {
+    frequencyParameter = parameters.getRawParameterValue ("frequency");
+    waveformParameter = parameters.getRawParameterValue ("waveform");
 }
 
 TestPluginAudioProcessor::~TestPluginAudioProcessor()
@@ -93,8 +107,8 @@ void TestPluginAudioProcessor::changeProgramName (int index, const juce::String&
 //==============================================================================
 void TestPluginAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    // Use this method as the place to do any pre-playback
-    // initialisation that you need..
+    juce::ignoreUnused (sampleRate, samplesPerBlock);
+    phase = 0.0;
 }
 
 void TestPluginAudioProcessor::releaseResources()
@@ -131,33 +145,32 @@ bool TestPluginAudioProcessor::isBusesLayoutSupported (const BusesLayout& layout
 
 void TestPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
+    juce::ignoreUnused (midiMessages);
     juce::ScopedNoDenormals noDenormals;
-    auto totalNumInputChannels  = getTotalNumInputChannels();
-    auto totalNumOutputChannels = getTotalNumOutputChannels();
+    const auto frequency = frequencyParameter->load (std::memory_order_relaxed);
+    const auto waveform = static_cast<int> (waveformParameter->load (std::memory_order_relaxed));
+    const auto phaseIncrement = frequency / getSampleRate();
+    const auto numSamples = buffer.getNumSamples();
+    const auto numChannels = buffer.getNumChannels();
 
-    // In case we have more outputs than inputs, this code clears any output
-    // channels that didn't contain input data, (because these aren't
-    // guaranteed to be empty - they may contain garbage).
-    // This is here to avoid people getting screaming feedback
-    // when they first compile a plugin, but obviously you don't need to keep
-    // this code if your algorithm always overwrites all the output channels.
-    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-        buffer.clear (i, 0, buffer.getNumSamples());
-
-    // This is the place where you'd normally do the guts of your plugin's
-    // audio processing...
-    // Make sure to reset the state if your inner loop is processing
-    // the samples and the outer loop is handling the channels.
-    // Alternatively, you can process the samples with the channels
-    // interleaved by keeping the same state.
-    for (int channel = 0; channel < totalNumInputChannels; ++channel)
+    for (int sample = 0; sample < numSamples; ++sample)
     {
-        auto* channelData = buffer.getWritePointer (channel);
+        float value = 0.0f;
 
-        // ..do something to the data...
+        switch (waveform)
+        {
+            case 1:  value = phase < 0.5 ? 1.0f : -1.0f; break;
+            case 2:  value = static_cast<float> (2.0 * phase - 1.0); break;
+            default: value = static_cast<float> (std::sin (juce::MathConstants<double>::twoPi * phase)); break;
+        }
+
+        for (int channel = 0; channel < numChannels; ++channel)
+            buffer.setSample (channel, sample, value);
+
+        phase += phaseIncrement;
+        phase -= std::floor (phase);
     }
 }
-
 //==============================================================================
 bool TestPluginAudioProcessor::hasEditor() const
 {
@@ -172,17 +185,16 @@ juce::AudioProcessorEditor* TestPluginAudioProcessor::createEditor()
 //==============================================================================
 void TestPluginAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
-    // You should use this method to store your parameters in the memory block.
-    // You could do that either as raw data, or use the XML or ValueTree classes
-    // as intermediaries to make it easy to save and load complex data.
+    if (auto state = parameters.copyState(); auto xml = state.createXml())
+        copyXmlToBinary (*xml, destData);
 }
 
 void TestPluginAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
-    // You should use this method to restore your parameters from this memory block,
-    // whose contents will have been created by the getStateInformation() call.
+    if (auto xml = getXmlFromBinary (data, sizeInBytes))
+        if (xml->hasTagName (parameters.state.getType()))
+            parameters.replaceState (juce::ValueTree::fromXml (*xml));
 }
-
 //==============================================================================
 // This creates new instances of the plugin..
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()

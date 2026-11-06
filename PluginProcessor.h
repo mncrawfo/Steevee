@@ -53,7 +53,13 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
+    juce::AudioProcessorValueTreeState& getParameters() { return parameters; }
+
 private:
-    //==============================================================================
+    juce::AudioProcessorValueTreeState parameters;
+    std::atomic<float>* frequencyParameter = nullptr;
+    std::atomic<float>* waveformParameter = nullptr;
+    double phase = 0.0;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TestPluginAudioProcessor)
 };
