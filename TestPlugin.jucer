@@ -5,12 +5,12 @@
   <MAINGROUP id="gQ3cBv" name="TestPlugin">
     <GROUP id="{BC9D0281-B13A-1E3E-8A88-9644E17E5EB9}" name="Source">
       <FILE id="TAl7BV" name="PluginProcessor.cpp" compile="1" resource="0"
-            file="Source/PluginProcessor.cpp"/>
+            file="PluginProcessor.cpp"/>
       <FILE id="sEBAwh" name="PluginProcessor.h" compile="0" resource="0"
-            file="Source/PluginProcessor.h"/>
+            file="PluginProcessor.h"/>
       <FILE id="fFcaic" name="PluginEditor.cpp" compile="1" resource="0"
-            file="Source/PluginEditor.cpp"/>
-      <FILE id="GhhdbL" name="PluginEditor.h" compile="0" resource="0" file="Source/PluginEditor.h"/>
+            file="PluginEditor.cpp"/>
+      <FILE id="GhhdbL" name="PluginEditor.h" compile="0" resource="0" file="PluginEditor.h"/>
     </GROUP>
   </MAINGROUP>
   <MODULES>
@@ -37,21 +37,18 @@
         <CONFIGURATION isDebug="1" name="Debug" targetName="TestPlugin"/>
         <CONFIGURATION isDebug="0" name="Release" targetName="TestPlugin"/>
       </CONFIGURATIONS>
-      <MODULEPATHS>
-        <MODULEPATH id="juce_audio_basics" path="../modules"/>
-        <MODULEPATH id="juce_audio_devices" path="../modules"/>
-        <MODULEPATH id="juce_audio_formats" path="../modules"/>
-        <MODULEPATH id="juce_audio_plugin_client" path="../modules"/>
-        <MODULEPATH id="juce_audio_processors" path="../modules"/>
-        <MODULEPATH id="juce_audio_processors_headless" path="../modules"/>
-        <MODULEPATH id="juce_audio_utils" path="../modules"/>
-        <MODULEPATH id="juce_core" path="../modules"/>
-        <MODULEPATH id="juce_data_structures" path="../modules"/>
-        <MODULEPATH id="juce_events" path="../modules"/>
-        <MODULEPATH id="juce_graphics" path="../modules"/>
-        <MODULEPATH id="juce_gui_basics" path="../modules"/>
-        <MODULEPATH id="juce_gui_extra" path="../modules"/>
-      </MODULEPATHS>
     </XCODE_MAC>
+    <LINUX_MAKE targetFolder="Builds/LinuxMakefile">
+      <CONFIGURATIONS>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="TestPlugin"/>
+        <CONFIGURATION isDebug="0" name="Release" targetName="TestPlugin"/>
+      </CONFIGURATIONS>
+    </LINUX_MAKE>
+    <VS2022 targetFolder="Builds/VisualStudio2022">
+      <CONFIGURATIONS>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="TestPlugin"/>
+        <CONFIGURATION isDebug="0" name="Release" targetName="TestPlugin"/>
+      </CONFIGURATIONS>
+    </VS2022>
   </EXPORTFORMATS>
 </JUCERPROJECT>
