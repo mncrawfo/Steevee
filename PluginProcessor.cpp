@@ -10,7 +10,7 @@
 #include "PluginEditor.h"
 
 //==============================================================================
-TestPluginAudioProcessor::TestPluginAudioProcessor()
+MIDISynthAudioProcessor::MIDISynthAudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
      : AudioProcessor (BusesProperties()
                      #if ! JucePlugin_IsMidiEffect
@@ -20,35 +20,29 @@ TestPluginAudioProcessor::TestPluginAudioProcessor()
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
                        )
-#else
-     : AudioProcessor()
 #endif
-    , parameters (*this, nullptr, juce::Identifier ("TestPluginState"),
-                  {
-                      std::make_unique<juce::AudioParameterFloat> (
-                          juce::ParameterID { "frequency", 1 }, "Frequency",
-                          juce::NormalisableRange<float> (20.0f, 2000.0f, 1.0f, 0.35f),
-                          440.0f, "Hz"),
-                      std::make_unique<juce::AudioParameterChoice> (
-                          juce::ParameterID { "waveform", 1 }, "Waveform",
-                          juce::StringArray { "Sine", "Square", "Sawtooth" }, 0)
-                  })
 {
-    frequencyParameter = parameters.getRawParameterValue ("frequency");
-    waveformParameter = parameters.getRawParameterValue ("waveform");
+    // Create 8 synthesizer voices
+    for (int i = 0; i < 8; ++i)
+    {
+        synthesiser.addVoice(new SineWaveVoice());
+    }
+
+    // Add our sound
+    synthesiser.addSound(new SineWaveSound());
 }
 
-TestPluginAudioProcessor::~TestPluginAudioProcessor()
+MIDISynthAudioProcessor::~MIDISynthAudioProcessor()
 {
 }
 
 //==============================================================================
-const juce::String TestPluginAudioProcessor::getName() const
+const juce::String MIDISynthAudioProcessor::getName() const
 {
     return JucePlugin_Name;
 }
 
-bool TestPluginAudioProcessor::acceptsMidi() const
+bool MIDISynthAudioProcessor::acceptsMidi() const
 {
    #if JucePlugin_WantsMidiInput
     return true;
@@ -57,7 +51,7 @@ bool TestPluginAudioProcessor::acceptsMidi() const
    #endif
 }
 
-bool TestPluginAudioProcessor::producesMidi() const
+bool MIDISynthAudioProcessor::producesMidi() const
 {
    #if JucePlugin_ProducesMidiOutput
     return true;
@@ -66,7 +60,7 @@ bool TestPluginAudioProcessor::producesMidi() const
    #endif
 }
 
-bool TestPluginAudioProcessor::isMidiEffect() const
+bool MIDISynthAudioProcessor::isMidiEffect() const
 {
    #if JucePlugin_IsMidiEffect
     return true;
@@ -75,50 +69,51 @@ bool TestPluginAudioProcessor::isMidiEffect() const
    #endif
 }
 
-double TestPluginAudioProcessor::getTailLengthSeconds() const
+double MIDISynthAudioProcessor::getTailLengthSeconds() const
 {
     return 0.0;
 }
 
-int TestPluginAudioProcessor::getNumPrograms()
+int MIDISynthAudioProcessor::getNumPrograms()
 {
     return 1;   // NB: some hosts don't cope very well if you tell them there are 0 programs,
                 // so this should be at least 1, even if you're not really implementing programs.
 }
 
-int TestPluginAudioProcessor::getCurrentProgram()
+int MIDISynthAudioProcessor::getCurrentProgram()
 {
     return 0;
 }
 
-void TestPluginAudioProcessor::setCurrentProgram (int index)
+void MIDISynthAudioProcessor::setCurrentProgram (int index)
 {
 }
 
-const juce::String TestPluginAudioProcessor::getProgramName (int index)
+const juce::String MIDISynthAudioProcessor::getProgramName (int index)
 {
     return {};
 }
 
-void TestPluginAudioProcessor::changeProgramName (int index, const juce::String& newName)
+void MIDISynthAudioProcessor::changeProgramName (int index, const juce::String& newName)
 {
 }
 
 //==============================================================================
-void TestPluginAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
+void MIDISynthAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    juce::ignoreUnused (sampleRate, samplesPerBlock);
-    phase = 0.0;
+    // Use this method as the place to do any pre-playback
+    // initialisation that you need..
+    synthesiser.setCurrentPlaybackSampleRate(sampleRate);
 }
 
-void TestPluginAudioProcessor::releaseResources()
+void MIDISynthAudioProcessor::releaseResources()
 {
     // When playback stops, you can use this as an opportunity to free up any
     // spare memory, etc.
 }
 
 #ifndef JucePlugin_PreferredChannelConfigurations
-bool TestPluginAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
+bool MIDISynthAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 {
   #if JucePlugin_IsMidiEffect
     juce::ignoreUnused (layouts);
@@ -143,61 +138,54 @@ bool TestPluginAudioProcessor::isBusesLayoutSupported (const BusesLayout& layout
 }
 #endif
 
-void TestPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
+void MIDISynthAudioProcessor::processBlock(
+    juce::AudioBuffer<float>& buffer,
+    juce::MidiBuffer& midiMessages)
 {
-    juce::ignoreUnused (midiMessages);
     juce::ScopedNoDenormals noDenormals;
-    const auto frequency = frequencyParameter->load (std::memory_order_relaxed);
-    const auto waveform = static_cast<int> (waveformParameter->load (std::memory_order_relaxed));
-    const auto phaseIncrement = frequency / getSampleRate();
-    const auto numSamples = buffer.getNumSamples();
-    const auto numChannels = buffer.getNumChannels();
 
-    for (int sample = 0; sample < numSamples; ++sample)
-    {
-        float value = 0.0f;
+    // Clear the audio buffer
+    buffer.clear();
 
-        switch (waveform)
-        {
-            case 1:  value = phase < 0.5 ? 1.0f : -1.0f; break;
-            case 2:  value = static_cast<float> (2.0 * phase - 1.0); break;
-            default: value = static_cast<float> (std::sin (juce::MathConstants<double>::twoPi * phase)); break;
-        }
-
-        for (int channel = 0; channel < numChannels; ++channel)
-            buffer.setSample (channel, sample, value);
-
-        phase += phaseIncrement;
-        phase -= std::floor (phase);
-    }
+    // Generate audio using incoming MIDI messages
+    synthesiser.renderNextBlock(
+        buffer,
+        midiMessages,
+        0,
+        buffer.getNumSamples()
+    );
 }
+
 //==============================================================================
-bool TestPluginAudioProcessor::hasEditor() const
+bool MIDISynthAudioProcessor::hasEditor() const
 {
     return true; // (change this to false if you choose to not supply an editor)
 }
 
-juce::AudioProcessorEditor* TestPluginAudioProcessor::createEditor()
+juce::AudioProcessorEditor* MIDISynthAudioProcessor::createEditor()
 {
-    return new TestPluginAudioProcessorEditor (*this);
+    return new MIDISynthAudioProcessorEditor (*this);
 }
 
 //==============================================================================
-void TestPluginAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
+void MIDISynthAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
-    if (auto state = parameters.copyState(); auto xml = state.createXml())
-        copyXmlToBinary (*xml, destData);
+    // You should use this method to store your parameters in the memory block.
+    // You could do that either as raw data, or use the XML or ValueTree classes
+    // as intermediaries to make it easy to save and load complex data.
 }
 
-void TestPluginAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
+void MIDISynthAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
-    if (auto xml = getXmlFromBinary (data, sizeInBytes))
-        if (xml->hasTagName (parameters.state.getType()))
-            parameters.replaceState (juce::ValueTree::fromXml (*xml));
+    // You should use this method to restore your parameters from this memory block,
+    // whose contents will have been created by the getStateInformation() call.
 }
+
+
+
 //==============================================================================
 // This creates new instances of the plugin..
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
-    return new TestPluginAudioProcessor();
+    return new MIDISynthAudioProcessor();
 }

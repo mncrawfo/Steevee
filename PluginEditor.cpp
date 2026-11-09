@@ -10,59 +10,48 @@
 #include "PluginEditor.h"
 
 //==============================================================================
-TestPluginAudioProcessorEditor::TestPluginAudioProcessorEditor (TestPluginAudioProcessor& p)
+MIDISynthAudioProcessorEditor::MIDISynthAudioProcessorEditor (MIDISynthAudioProcessor& p)
     : AudioProcessorEditor (&p), audioProcessor (p)
 {
-    frequencyLabel.setText ("Frequency", juce::dontSendNotification);
-    frequencyLabel.setJustificationType (juce::Justification::centredLeft);
-    addAndMakeVisible (frequencyLabel);
-
-    frequencySlider.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
-    frequencySlider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 100, 24);
-    frequencySlider.setTextValueSuffix (" Hz");
-    addAndMakeVisible (frequencySlider);
-    frequencyAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
-        audioProcessor.getParameters(), "frequency", frequencySlider);
-
-    waveformLabel.setText ("Waveform", juce::dontSendNotification);
-    waveformLabel.setJustificationType (juce::Justification::centredLeft);
-    addAndMakeVisible (waveformLabel);
-
-    waveformSelector.addItem ("Sine", 1);
-    waveformSelector.addItem ("Square", 2);
-    waveformSelector.addItem ("Sawtooth", 3);
-    addAndMakeVisible (waveformSelector);
-    waveformAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (
-        audioProcessor.getParameters(), "waveform", waveformSelector);
-
-    setSize (360, 240);
-    setResizeLimits (360, 240, 360, 240);
+    midiVolume.addListener (this);
+    // Make sure that before the constructor has finished, you've set the
+    // editor's size to whatever you need it to be.
+    setSize (200, 200);
+    // these define the parameters of our slider object
+    midiVolume.setSliderStyle (juce::Slider::LinearBarVertical);
+    midiVolume.setRange (0.0, 127.0, 1.0);
+    midiVolume.setTextBoxStyle (juce::Slider::NoTextBox, false, 90, 0);
+    midiVolume.setPopupDisplayEnabled (true, false, this);
+    midiVolume.setTextValueSuffix (" Volume");
+    midiVolume.setValue (1.0);
+    // this function adds the slider to the editor
+    addAndMakeVisible (&midiVolume);
 }
 
-TestPluginAudioProcessorEditor::~TestPluginAudioProcessorEditor()
+MIDISynthAudioProcessorEditor::~MIDISynthAudioProcessorEditor()
 {
+}
+
+void MIDISynthAudioProcessorEditor::sliderValueChanged (juce::Slider* slider)
+{
+    //audioProcessor.noteOnVel = midiVolume.getValue();
 }
 
 //==============================================================================
-void TestPluginAudioProcessorEditor::paint (juce::Graphics& g)
+void MIDISynthAudioProcessorEditor::paint (juce::Graphics& g)
 {
-    g.fillAll (getLookAndFeel().findColour (juce::ResizableWindow::backgroundColourId));
-    g.setColour (juce::Colours::white);
-    g.setFont (juce::FontOptions (22.0f));
-    g.drawFittedText ("Simple Oscillator", getLocalBounds().removeFromTop (52),
-                      juce::Justification::centred, 1);
+    // fill the whole window white
+        g.fillAll (juce::Colours::white);
+        // set the current drawing colour to black
+        g.setColour (juce::Colours::black);
+        // set the font size and draw text to the screen
+        g.setFont (15.0f);
+    g.drawFittedText ("Midi Volume", 0, 0, getWidth(), 30, juce::Justification::centred, 1);
 }
 
-void TestPluginAudioProcessorEditor::resized()
+void MIDISynthAudioProcessorEditor::resized()
 {
-    auto area = getLocalBounds().reduced (24);
-    area.removeFromTop (44);
-
-    auto controlRow = area.removeFromTop (36);
-    waveformLabel.setBounds (controlRow.removeFromLeft (100));
-    waveformSelector.setBounds (controlRow.removeFromLeft (180));
-
-    area.removeFromTop (12);
-    frequencyLabel.setBounds (area.removeFromTop (24));
-    frequencySlider.setBounds (area);
+    // sets the position and size of the slider with arguments (x, y, width, height)
+        midiVolume.setBounds (40, 30, 20, getHeight() - 60);
 }
+

@@ -14,24 +14,24 @@
 //==============================================================================
 /**
 */
-class TestPluginAudioProcessorEditor  : public juce::AudioProcessorEditor
+class MIDISynthAudioProcessorEditor : public juce::AudioProcessorEditor,
+                                           private juce::Slider::Listener // [2]
 {
 public:
-    TestPluginAudioProcessorEditor (TestPluginAudioProcessor&);
-    ~TestPluginAudioProcessorEditor() override;
-
-    //==============================================================================
-    void paint (juce::Graphics&) override;
+    MIDISynthAudioProcessorEditor (MIDISynthAudioProcessor&);
+    ~MIDISynthAudioProcessorEditor();
+    //==================================================================
+    // This is just a standard Juce paint method...
+    void paint (juce::Graphics& g) override;
     void resized() override;
-
 private:
-    TestPluginAudioProcessor& audioProcessor;
-    juce::Label frequencyLabel;
-    juce::Slider frequencySlider;
-    juce::Label waveformLabel;
-    juce::ComboBox waveformSelector;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> frequencyAttachment;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> waveformAttachment;
-
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TestPluginAudioProcessorEditor)
+    void sliderValueChanged (juce::Slider* slider) override; // [3]
+    //==================================================================
+    // This reference is provided as a quick way for your editor to
+    // access the processor object that created it.
+    MIDISynthAudioProcessor& audioProcessor;
+    juce::Slider midiVolume;
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MIDISynthAudioProcessorEditor)
 };
+
+
