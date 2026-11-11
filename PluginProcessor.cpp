@@ -19,17 +19,19 @@ MIDISynthAudioProcessor::MIDISynthAudioProcessor()
                       #endif
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
-                       )
+                       ),
+#else
+     :
 #endif
+      parameters (*this, nullptr, "Parameters",
+                  { std::make_unique<juce::AudioParameterChoice> (
+                        juce::ParameterID { "waveform", 1 }, "Waveform",
+                        juce::StringArray { "Sine", "Square", "Sawtooth" }, 0) })
 {
-    // Create 8 synthesizer voices
     for (int i = 0; i < 8; ++i)
-    {
-        synthesiser.addVoice(new SineWaveVoice());
-    }
+        synthesiser.addVoice (new SynthVoice (*parameters.getRawParameterValue ("waveform")));
 
-    // Add our sound
-    synthesiser.addSound(new SineWaveSound());
+    synthesiser.addSound (new SynthSound());
 }
 
 MIDISynthAudioProcessor::~MIDISynthAudioProcessor()
@@ -71,7 +73,7 @@ bool MIDISynthAudioProcessor::isMidiEffect() const
 
 double MIDISynthAudioProcessor::getTailLengthSeconds() const
 {
-    return 0.0;
+    return 0.05;
 }
 
 int MIDISynthAudioProcessor::getNumPrograms()
@@ -147,6 +149,8 @@ void MIDISynthAudioProcessor::processBlock(
     // Clear the audio buffer
     buffer.clear();
 
+    keyboardState.processNextMidiBuffer (midiMessages, 0, buffer.getNumSamples(), true);
+
     // Generate audio using incoming MIDI messages
     synthesiser.renderNextBlock(
         buffer,
@@ -170,15 +174,15 @@ juce::AudioProcessorEditor* MIDISynthAudioProcessor::createEditor()
 //==============================================================================
 void MIDISynthAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
-    // You should use this method to store your parameters in the memory block.
-    // You could do that either as raw data, or use the XML or ValueTree classes
-    // as intermediaries to make it easy to save and load complex data.
+    if (auto state = parameters.copyState().createXml())
+        copyXmlToBinary (*state, destData);
 }
 
 void MIDISynthAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
-    // You should use this method to restore your parameters from this memory block,
-    // whose contents will have been created by the getStateInformation() call.
+    if (auto state = getXmlFromBinary (data, sizeInBytes))
+        if (state->hasTagName (parameters.state.getType()))
+            parameters.replaceState (juce::ValueTree::fromXml (*state));
 }
 
 

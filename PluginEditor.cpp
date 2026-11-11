@@ -1,57 +1,36 @@
-/*
-  ==============================================================================
-
-    This file contains the basic framework code for a JUCE plugin editor.
-
-  ==============================================================================
-*/
-
-#include "PluginProcessor.h"
 #include "PluginEditor.h"
 
-//==============================================================================
-MIDISynthAudioProcessorEditor::MIDISynthAudioProcessorEditor (MIDISynthAudioProcessor& p)
-    : AudioProcessorEditor (&p), audioProcessor (p)
+MIDISynthAudioProcessorEditor::MIDISynthAudioProcessorEditor (MIDISynthAudioProcessor& processor)
+    : AudioProcessorEditor (&processor),
+      keyboard (processor.keyboardState, juce::MidiKeyboardComponent::horizontalKeyboard)
 {
-    midiVolume.addListener (this);
-    // Make sure that before the constructor has finished, you've set the
-    // editor's size to whatever you need it to be.
-    setSize (200, 200);
-    // these define the parameters of our slider object
-    midiVolume.setSliderStyle (juce::Slider::LinearBarVertical);
-    midiVolume.setRange (0.0, 127.0, 1.0);
-    midiVolume.setTextBoxStyle (juce::Slider::NoTextBox, false, 90, 0);
-    midiVolume.setPopupDisplayEnabled (true, false, this);
-    midiVolume.setTextValueSuffix (" Volume");
-    midiVolume.setValue (1.0);
-    // this function adds the slider to the editor
-    addAndMakeVisible (&midiVolume);
+    waveformLabel.setText ("Waveform", juce::dontSendNotification);
+    waveformLabel.attachToComponent (&waveformSelector, true);
+    addAndMakeVisible (waveformSelector);
+    waveformSelector.addItemList ({ "Sine", "Square", "Sawtooth" }, 1);
+    waveformAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (
+        processor.parameters, "waveform", waveformSelector);
+    addAndMakeVisible (keyboard);
+    keyboard.setAvailableRange (48, 84);
+
+    setSize (560, 220);
 }
 
-MIDISynthAudioProcessorEditor::~MIDISynthAudioProcessorEditor()
-{
-}
+MIDISynthAudioProcessorEditor::~MIDISynthAudioProcessorEditor() = default;
 
-void MIDISynthAudioProcessorEditor::sliderValueChanged (juce::Slider* slider)
-{
-    //audioProcessor.noteOnVel = midiVolume.getValue();
-}
-
-//==============================================================================
 void MIDISynthAudioProcessorEditor::paint (juce::Graphics& g)
 {
-    // fill the whole window white
-        g.fillAll (juce::Colours::white);
-        // set the current drawing colour to black
-        g.setColour (juce::Colours::black);
-        // set the font size and draw text to the screen
-        g.setFont (15.0f);
-    g.drawFittedText ("Midi Volume", 0, 0, getWidth(), 30, juce::Justification::centred, 1);
+    g.fillAll (juce::Colour (0xff202530));
+    g.setColour (juce::Colours::white);
+    g.setFont (20.0f);
+    g.drawText ("MIDI Synth", 20, 12, getWidth() - 40, 30, juce::Justification::centredLeft);
+    g.setFont (14.0f);
+    g.drawText ("Play the keys below or send MIDI from your host.", 20, 90,
+                getWidth() - 40, 24, juce::Justification::centredLeft);
 }
 
 void MIDISynthAudioProcessorEditor::resized()
 {
-    // sets the position and size of the slider with arguments (x, y, width, height)
-        midiVolume.setBounds (40, 30, 20, getHeight() - 60);
+    waveformSelector.setBounds (110, 52, 180, 28);
+    keyboard.setBounds (20, 120, getWidth() - 40, 80);
 }
-

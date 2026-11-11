@@ -19,9 +19,10 @@ into the shared project.
 
 ## Use the oscillator
 
-The plug-in continuously generates a tone. Choose Sine, Square, or Sawtooth
-from the Waveform menu and adjust its Frequency control (20-2000 Hz). The
-settings are saved by the plug-in host.
+Choose Sine, Square, or Sawtooth from the Waveform menu, then play notes using
+the on-screen keyboard or send MIDI notes from your host or MIDI controller.
+The synth supports up to eight simultaneous notes. The waveform selection is
+automatable and saved by the plug-in host.
 
 ## Open the project
 

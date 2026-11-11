@@ -1,37 +1,22 @@
-/*
-  ==============================================================================
-
-    This file contains the basic framework code for a JUCE plugin editor.
-
-  ==============================================================================
-*/
-
 #pragma once
 
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
 
-//==============================================================================
-/**
-*/
-class MIDISynthAudioProcessorEditor : public juce::AudioProcessorEditor,
-                                           private juce::Slider::Listener // [2]
+class MIDISynthAudioProcessorEditor : public juce::AudioProcessorEditor
 {
 public:
-    MIDISynthAudioProcessorEditor (MIDISynthAudioProcessor&);
-    ~MIDISynthAudioProcessorEditor();
-    //==================================================================
-    // This is just a standard Juce paint method...
+    explicit MIDISynthAudioProcessorEditor (MIDISynthAudioProcessor&);
+    ~MIDISynthAudioProcessorEditor() override;
+
     void paint (juce::Graphics& g) override;
     void resized() override;
+
 private:
-    void sliderValueChanged (juce::Slider* slider) override; // [3]
-    //==================================================================
-    // This reference is provided as a quick way for your editor to
-    // access the processor object that created it.
-    MIDISynthAudioProcessor& audioProcessor;
-    juce::Slider midiVolume;
+    juce::Label waveformLabel;
+    juce::ComboBox waveformSelector;
+    juce::MidiKeyboardComponent keyboard;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> waveformAttachment;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MIDISynthAudioProcessorEditor)
 };
-
-
