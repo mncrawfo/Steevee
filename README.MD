@@ -20,12 +20,15 @@ into the shared project.
 ## Use the oscillator
 
 Choose Sine, Square, or Sawtooth from the Waveform menu, then play notes using
-the on-screen keyboard or send MIDI notes from your host or MIDI controller.
+the on-screen keyboard, computer keyboard, or MIDI notes from your host or MIDI
+controller. Click inside the plug-in to give it keyboard focus; some hosts may
+require enabling keyboard input for plug-in windows.
 Use **+** below the oscillator stack to add another layer, and adjust each
 layer's waveform and volume independently. Scroll the stack to reach additional
 layers. There is no oscillator limit; a warning appears above four because more
 layers increase CPU use and can cause clipping. Lower individual volumes if
-the combined output is too loud.
+the combined output is too loud. Use **Remove** to delete a layer; at least one
+oscillator remains.
 
 The synth supports up to eight simultaneous notes. Oscillator settings are
 saved by the plug-in host. The first waveform is host-automatable; additional

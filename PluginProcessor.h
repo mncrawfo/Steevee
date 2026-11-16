@@ -152,6 +152,7 @@ public:
     void setStateInformation (const void* data, int sizeInBytes) override;
 
     void addOscillator();
+    bool removeOscillator (OscillatorSettings* oscillator);
     OscillatorSettings* getOscillators() const noexcept;
 
     juce::AudioProcessorValueTreeState parameters;

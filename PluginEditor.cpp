@@ -1,6 +1,7 @@
 #include "PluginEditor.h"
 
-OscillatorRow::OscillatorRow (MIDISynthAudioProcessor& owner, OscillatorSettings& layer, int index)
+OscillatorRow::OscillatorRow (MIDISynthAudioProcessor& owner, OscillatorSettings& layer, int index,
+                              bool canRemove)
     : processor (owner), settings (layer)
 {
     title.setText ("Oscillator " + juce::String (index + 1), juce::dontSendNotification);
@@ -13,6 +14,8 @@ OscillatorRow::OscillatorRow (MIDISynthAudioProcessor& owner, OscillatorSettings
     volume.setName ("Oscillator " + juce::String (index + 1) + " volume");
     volume.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
     volume.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 58, 18);
+    volume.setTextBoxIsEditable (false);
+    volume.setWantsKeyboardFocus (false);
     volume.setRange (0.0, 1.0, 0.01);
     volume.textFromValueFunction = [] (double value) { return juce::String (juce::roundToInt (value * 100.0)) + "%"; };
     volume.valueFromTextFunction = [] (const juce::String& text) { return text.getDoubleValue() / 100.0; };
@@ -25,6 +28,7 @@ OscillatorRow::OscillatorRow (MIDISynthAudioProcessor& owner, OscillatorSettings
     addAndMakeVisible (volume);
 
     waveform.setName ("Oscillator " + juce::String (index + 1) + " waveform");
+    waveform.setWantsKeyboardFocus (false);
     waveform.addItemList ({ "Sine", "Square", "Sawtooth" }, 1);
     addAndMakeVisible (waveform);
     if (index == 0)
@@ -39,6 +43,12 @@ OscillatorRow::OscillatorRow (MIDISynthAudioProcessor& owner, OscillatorSettings
             processor.updateHostDisplay (juce::AudioProcessorListener::ChangeDetails().withNonParameterStateChanged (true));
         };
     }
+
+    removeButton.setName ("Remove oscillator " + juce::String (index + 1));
+    removeButton.setEnabled (canRemove);
+    removeButton.setWantsKeyboardFocus (false);
+    removeButton.onClick = [this] { processor.removeOscillator (&settings); };
+    addAndMakeVisible (removeButton);
 }
 
 void OscillatorRow::refresh()
@@ -51,7 +61,8 @@ void OscillatorRow::refresh()
 
 void OscillatorRow::resized()
 {
-    title.setBounds (10, 4, getWidth() - 20, 20);
+    title.setBounds (10, 4, getWidth() - 100, 20);
+    removeButton.setBounds (getWidth() - 90, 4, 80, 26);
     volumeLabel.setBounds (10, 25, 70, 18);
     volume.setBounds (10, 42, 70, 65);
     waveform.setBounds (100, 54, juce::jmax (0, getWidth() - 120), 28);
@@ -61,10 +72,13 @@ MIDISynthAudioProcessorEditor::MIDISynthAudioProcessorEditor (MIDISynthAudioProc
     : AudioProcessorEditor (&owner), processor (owner),
       keyboard (owner.keyboardState, juce::MidiKeyboardComponent::horizontalKeyboard)
 {
+    setWantsKeyboardFocus (true);
+    addMouseListener (this, true);
     viewport.setViewedComponent (&oscillatorContent, false);
     viewport.setScrollBarsShown (true, false);
     addAndMakeVisible (viewport);
     addButton.setTooltip ("Add an oscillator");
+    addButton.setWantsKeyboardFocus (false);
     addButton.onClick = [this]
     {
         processor.addOscillator();
@@ -80,7 +94,9 @@ MIDISynthAudioProcessorEditor::MIDISynthAudioProcessorEditor (MIDISynthAudioProc
     addAndMakeVisible (keyboard);
     keyboard.setAvailableRange (48, 84);
 
-    setSize (560, 500);
+    setResizable (true, true);
+    setResizeLimits (560, 500, 1600, 1200);
+    setSize (900, 720);
     rebuildRows();
     startTimerHz (15);
 }
@@ -88,7 +104,31 @@ MIDISynthAudioProcessorEditor::MIDISynthAudioProcessorEditor (MIDISynthAudioProc
 MIDISynthAudioProcessorEditor::~MIDISynthAudioProcessorEditor()
 {
     stopTimer();
+    removeMouseListener (this);
+    keyboard.focusLost (focusChangedDirectly);
     viewport.setViewedComponent (nullptr, false);
+}
+
+bool MIDISynthAudioProcessorEditor::keyPressed (const juce::KeyPress& key)
+{
+    return keyboard.keyPressed (key);
+}
+
+bool MIDISynthAudioProcessorEditor::keyStateChanged (bool isKeyDown)
+{
+    return keyboard.keyStateChanged (isKeyDown);
+}
+
+void MIDISynthAudioProcessorEditor::focusOfChildComponentChanged (FocusChangeType cause)
+{
+    if (! hasKeyboardFocus (true))
+        keyboard.focusLost (cause);
+}
+
+void MIDISynthAudioProcessorEditor::mouseDown (const juce::MouseEvent&)
+{
+    if (! hasKeyboardFocus (true))
+        grabKeyboardFocus();
 }
 
 void MIDISynthAudioProcessorEditor::timerCallback()
@@ -111,7 +151,8 @@ void MIDISynthAudioProcessorEditor::rebuildRows()
     rows.clear();
     for (size_t i = 0; i < ordered.size(); ++i)
     {
-        auto* row = rows.add (new OscillatorRow (processor, *ordered[i], static_cast<int> (i)));
+        auto* row = rows.add (new OscillatorRow (processor, *ordered[i], static_cast<int> (i),
+                                                ordered.size() > 1));
         oscillatorContent.addAndMakeVisible (row);
     }
     warning.setVisible (rows.size() > 4);
@@ -138,14 +179,14 @@ void MIDISynthAudioProcessorEditor::paint (juce::Graphics& g)
     g.setFont (20.0f);
     g.drawText ("MIDI Synth", 20, 12, getWidth() - 40, 30, juce::Justification::centredLeft);
     g.setFont (14.0f);
-    g.drawText ("Play the keys below or send MIDI from your host.", 20, 375,
-                getWidth() - 40, 24, juce::Justification::centredLeft);
+    g.drawText ("Play with the computer keyboard, on-screen keys, or MIDI from your host.",
+                20, getHeight() - 125, getWidth() - 40, 24, juce::Justification::centredLeft);
 }
 
 void MIDISynthAudioProcessorEditor::resized()
 {
-    viewport.setBounds (20, 48, getWidth() - 40, 285);
-    warning.setBounds (20, 338, getWidth() - 40, 28);
-    keyboard.setBounds (20, 405, getWidth() - 40, 75);
+    viewport.setBounds (20, 48, getWidth() - 40, getHeight() - 215);
+    warning.setBounds (20, getHeight() - 160, getWidth() - 40, 28);
+    keyboard.setBounds (20, getHeight() - 95, getWidth() - 40, 75);
     layoutRows();
 }

@@ -57,6 +57,44 @@ void MIDISynthAudioProcessor::addOscillator()
     updateHostDisplay (juce::AudioProcessorListener::ChangeDetails().withNonParameterStateChanged (true));
 }
 
+bool MIDISynthAudioProcessor::removeOscillator (OscillatorSettings* oscillator)
+{
+    bool firstRemoved = false;
+    float promotedWaveform = 0.0f;
+    {
+        const juce::ScopedLock lock (oscillatorChanges);
+        std::vector<OscillatorSettings*> ordered;
+        for (auto* layer = getOscillators(); layer != nullptr; layer = layer->next)
+            ordered.push_back (layer);
+        std::reverse (ordered.begin(), ordered.end());
+
+        const auto found = std::find (ordered.begin(), ordered.end(), oscillator);
+        if (ordered.size() <= 1 || found == ordered.end())
+            return false;
+
+        firstRemoved = found == ordered.begin();
+        ordered.erase (found);
+        promotedWaveform = ordered.front()->waveform->load (std::memory_order_relaxed);
+
+        OscillatorSettings* current = nullptr;
+        for (auto* layer : ordered)
+            current = createOscillator (current, current == nullptr,
+                                        layer->waveform->load (std::memory_order_relaxed),
+                                        layer->volume.load (std::memory_order_relaxed));
+        oscillators.store (current, std::memory_order_release);
+    }
+
+    if (firstRemoved)
+    {
+        auto* parameter = parameters.getParameter ("waveform");
+        parameter->beginChangeGesture();
+        parameter->setValueNotifyingHost (parameter->convertTo0to1 (promotedWaveform));
+        parameter->endChangeGesture();
+    }
+    updateHostDisplay (juce::AudioProcessorListener::ChangeDetails().withNonParameterStateChanged (true));
+    return true;
+}
+
 OscillatorSettings* MIDISynthAudioProcessor::getOscillators() const noexcept
 {
     return oscillators.load (std::memory_order_acquire);
