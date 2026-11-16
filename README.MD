@@ -21,8 +21,15 @@ into the shared project.
 
 Choose Sine, Square, or Sawtooth from the Waveform menu, then play notes using
 the on-screen keyboard or send MIDI notes from your host or MIDI controller.
-The synth supports up to eight simultaneous notes. The waveform selection is
-automatable and saved by the plug-in host.
+Use **+** below the oscillator stack to add another layer, and adjust each
+layer's waveform and volume independently. Scroll the stack to reach additional
+layers. There is no oscillator limit; a warning appears above four because more
+layers increase CPU use and can cause clipping. Lower individual volumes if
+the combined output is too loud.
+
+The synth supports up to eight simultaneous notes. Oscillator settings are
+saved by the plug-in host. The first waveform is host-automatable; additional
+waveforms and oscillator volumes are not currently exposed as host parameters.
 
 ## Open the project
 

@@ -1,6 +1,25 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include <algorithm>
+#include <atomic>
+#include <cmath>
+#include <memory>
+#include <vector>
+
+struct OscillatorSettings
+{
+    OscillatorSettings (OscillatorSettings* previous, std::atomic<float>* sharedWaveform,
+                        float initialWaveform, float initialVolume)
+        : next (previous), ownWaveform (initialWaveform),
+          waveform (sharedWaveform != nullptr ? sharedWaveform : &ownWaveform),
+          volume (initialVolume) {}
+
+    OscillatorSettings* const next;
+    std::atomic<float> ownWaveform;
+    std::atomic<float>* const waveform;
+    std::atomic<float> volume;
+};
 
 class SynthSound : public juce::SynthesiserSound
 {
@@ -12,8 +31,8 @@ public:
 class SynthVoice : public juce::SynthesiserVoice
 {
 public:
-    explicit SynthVoice (std::atomic<float>& waveformParameter)
-        : waveform (waveformParameter) {}
+    explicit SynthVoice (std::atomic<OscillatorSettings*>& oscillatorsToUse)
+        : oscillators (oscillatorsToUse) {}
 
     bool canPlaySound (juce::SynthesiserSound* sound) override
     {
@@ -53,17 +72,21 @@ public:
         if (phaseDelta == 0.0)
             return;
 
-        const auto selectedWaveform = static_cast<int> (waveform.load());
-
+        auto* const firstOscillator = oscillators.load (std::memory_order_acquire);
         for (int sample = 0; sample < numSamples; ++sample)
         {
             float value = 0.0f;
 
-            switch (selectedWaveform)
+            for (auto* oscillator = firstOscillator; oscillator != nullptr; oscillator = oscillator->next)
             {
-                case 1: value = phase < 0.5 ? 1.0f : -1.0f; break;
-                case 2: value = static_cast<float> (2.0 * phase - 1.0); break;
-                default: value = static_cast<float> (std::sin (phase * juce::MathConstants<double>::twoPi)); break;
+                float wave = 0.0f;
+                switch (static_cast<int> (oscillator->waveform->load (std::memory_order_relaxed)))
+                {
+                    case 1: wave = phase < 0.5 ? 1.0f : -1.0f; break;
+                    case 2: wave = static_cast<float> (2.0 * phase - 1.0); break;
+                    default: wave = static_cast<float> (std::sin (phase * juce::MathConstants<double>::twoPi)); break;
+                }
+                value += wave * oscillator->volume.load (std::memory_order_relaxed);
             }
 
             for (int channel = 0; channel < outputBuffer.getNumChannels(); ++channel)
@@ -88,7 +111,7 @@ public:
     }
 
 private:
-    std::atomic<float>& waveform;
+    std::atomic<OscillatorSettings*>& oscillators;
     double phase = 0.0;
     double phaseDelta = 0.0;
     float level = 0.0f;
@@ -128,10 +151,19 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
+    void addOscillator();
+    OscillatorSettings* getOscillators() const noexcept;
+
     juce::AudioProcessorValueTreeState parameters;
     juce::MidiKeyboardState keyboardState;
 
 private:
+    OscillatorSettings* createOscillator (OscillatorSettings* previous, bool first,
+                                          float waveform, float volume);
+    juce::CriticalSection oscillatorChanges;
+    // Published nodes stay alive until the processor is destroyed, so audio can read them without locking.
+    std::vector<std::unique_ptr<OscillatorSettings>> oscillatorStorage;
+    std::atomic<OscillatorSettings*> oscillators { nullptr };
     juce::Synthesiser synthesiser;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MIDISynthAudioProcessor)

@@ -28,10 +28,38 @@ MIDISynthAudioProcessor::MIDISynthAudioProcessor()
                         juce::ParameterID { "waveform", 1 }, "Waveform",
                         juce::StringArray { "Sine", "Square", "Sawtooth" }, 0) })
 {
+    oscillators.store (createOscillator (nullptr, true, 0.0f, 1.0f), std::memory_order_release);
     for (int i = 0; i < 8; ++i)
-        synthesiser.addVoice (new SynthVoice (*parameters.getRawParameterValue ("waveform")));
+        synthesiser.addVoice (new SynthVoice (oscillators));
 
     synthesiser.addSound (new SynthSound());
+}
+
+OscillatorSettings* MIDISynthAudioProcessor::createOscillator (OscillatorSettings* previous,
+                                                                bool first, float waveform,
+                                                                float volume)
+{
+    auto oscillator = std::make_unique<OscillatorSettings> (
+        previous, first ? parameters.getRawParameterValue ("waveform") : nullptr, waveform, volume);
+    auto* result = oscillator.get();
+    oscillatorStorage.push_back (std::move (oscillator));
+    return result;
+}
+
+void MIDISynthAudioProcessor::addOscillator()
+{
+    {
+        const juce::ScopedLock lock (oscillatorChanges);
+        auto* current = oscillators.load (std::memory_order_acquire);
+        oscillators.store (createOscillator (current, false, 0.0f, 0.5f),
+                           std::memory_order_release);
+    }
+    updateHostDisplay (juce::AudioProcessorListener::ChangeDetails().withNonParameterStateChanged (true));
+}
+
+OscillatorSettings* MIDISynthAudioProcessor::getOscillators() const noexcept
+{
+    return oscillators.load (std::memory_order_acquire);
 }
 
 MIDISynthAudioProcessor::~MIDISynthAudioProcessor()
@@ -174,15 +202,56 @@ juce::AudioProcessorEditor* MIDISynthAudioProcessor::createEditor()
 //==============================================================================
 void MIDISynthAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
-    if (auto state = parameters.copyState().createXml())
-        copyXmlToBinary (*state, destData);
+    auto state = parameters.copyState();
+    juce::ValueTree layers ("Oscillators");
+    std::vector<OscillatorSettings*> ordered;
+    for (auto* layer = getOscillators(); layer != nullptr; layer = layer->next)
+        ordered.push_back (layer);
+    std::reverse (ordered.begin(), ordered.end());
+
+    for (auto* layer : ordered)
+    {
+        juce::ValueTree item ("Oscillator");
+        item.setProperty ("waveform", layer->waveform->load (std::memory_order_relaxed), nullptr);
+        item.setProperty ("volume", layer->volume.load (std::memory_order_relaxed), nullptr);
+        layers.addChild (item, -1, nullptr);
+    }
+
+    state.addChild (layers, -1, nullptr);
+    if (auto xml = state.createXml())
+        copyXmlToBinary (*xml, destData);
 }
 
 void MIDISynthAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
     if (auto state = getXmlFromBinary (data, sizeInBytes))
         if (state->hasTagName (parameters.state.getType()))
-            parameters.replaceState (juce::ValueTree::fromXml (*state));
+        {
+            auto tree = juce::ValueTree::fromXml (*state);
+            auto layers = tree.getChildWithName ("Oscillators");
+            if (layers.isValid())
+                tree.removeChild (layers, nullptr);
+
+            const juce::ScopedLock lock (oscillatorChanges);
+            parameters.replaceState (tree);
+            OscillatorSettings* current = nullptr;
+
+            if (layers.isValid())
+            {
+                for (const auto& layer : layers)
+                {
+                    if (! layer.hasType ("Oscillator"))
+                        continue;
+                    const auto shape = juce::jlimit (0.0f, 2.0f, static_cast<float> (layer.getProperty ("waveform", 0.0f)));
+                    const auto volume = juce::jlimit (0.0f, 1.0f, static_cast<float> (layer.getProperty ("volume", 1.0f)));
+                    current = createOscillator (current, current == nullptr, shape, volume);
+                }
+            }
+
+            if (current == nullptr)
+                current = createOscillator (nullptr, true, 0.0f, 1.0f);
+            oscillators.store (current, std::memory_order_release);
+        }
 }
 
 

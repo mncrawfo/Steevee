@@ -8,3 +8,4 @@ JuceLibraryCode/
 *.user
 .DS_Store
 /JUCE/
+/Notes/
